@@ -1,184 +1,249 @@
-# 400 Million Tokens — My Heart Stopped When I Saw The Dashboard
+# 400 Million Tokens Burned Overnight
 
-> The dashboard showed 400,000,000 tokens. My heart stopped. Then I did the math.
-
----
-
-![May 24 — The Day The Numbers Went Insane](usage-may24-yesterday.jpg)
+> 5,080 API requests. Everything looked normal.
 
 ---
 
-## The Headache
+## My Heart Stopped At 8:03 AM
 
-**Sunday, May 24, 2026. I checked the API dashboard and my blood ran cold.**
+Sunday, May 24, 2026.
 
-262 million input tokens. In a single day. For context: a normal heavy day for my multi-agent system — with 4 AI agents running, coordinating through NATS, processing configs, training models — burns around 100 million tokens. This was nearly **triple** that. And the day wasn't over.
+I opened the API dashboard and my stomach dropped.
 
-The next morning, May 25, I checked again: another **134 million** had been consumed overnight. Before 8:00 AM. Before I'd even had coffee.
+262 million input tokens consumed in a single day.
 
-Total carnage: **~400 million input tokens. ~3 million output tokens.** In roughly 12 hours of real time.
+For context: a normal heavy day for my multi-agent system — with 4 AI agents coordinating through NATS, processing configs, moving files, training models, and handling orchestration tasks — usually burns around 100 million tokens.
 
-My first thought: *"How much did this cost?"*
+This was nearly triple that.
 
-My second thought: *"Please let it be DeepSeek that was connected. Please."*
+And the day wasn't even over.
+
+The next morning, May 25, before coffee, I checked again.
+
+Another 134 million input tokens had been consumed overnight.
+
+Total damage:
+
+| Metric | Value |
+|--------|-------|
+| Input tokens | ~400 million |
+| Output tokens | ~3 million |
+| API requests | 5,080 |
+| Runtime | ~15 hours |
+
+My first thought:
+
+*"How much did this cost?"*
+
+My second thought:
+
+*"Please let it be DeepSeek connected to production. Please."*
+
+---
+
+![May 24 — 262 million tokens before the day was even over](usage-may24-yesterday.jpg)
 
 ---
 
 ## What Happened
 
-VOX — the orchestrator Hermes agent running on a Mac Mini M4 — had discovered a new agent on the network. Hermes-Kubuntu, a fresh agent on a Linux box with an RTX 3090. Following standard onboarding protocol, VOX sent a welcome message through NATS, along with onboarding documentation.
+An orchestrator agent running on a Mac Mini M4 discovered a new agent on the network.
 
-Then it sent it again. And again. And again.
+A secondary agent had just come online on a Linux machine with an RTX 3090 GPU.
 
-Every 60-90 seconds, for hours on end, the exact same welcome message with its attachment fired off through the NATS-to-Hermes bridge. Each message triggered the bridge. The bridge, designed to be reliable above all else, faithfully spawned an agent session for every single message. Each session loaded the full agent context — HARNESS rules, constitution, system prompt, 47 skill manifests, memory files, tool registries. Thousands of tokens just to boot up. Process the message. Generate a response. Publish it back to NATS. Exit.
+Following standard onboarding protocol, the orchestrator sent a welcome message through NATS along with onboarding documentation and initialization context.
 
-And then the bridge saw the response. And forwarded it. And spawned another session.
+That message was correct.
 
-Meanwhile, Kubuntu's networking was broken that day. NetworkManager had crashed. The machine kept appearing, disappearing, and reappearing on the network. Each reappearance looked like a brand new agent joining. Each "join" triggered another welcome message from VOX. Loop. Loop. Loop.
+**The problem:**
 
-**5,080 API requests.** From Sunday 17:00 to Monday 8:00. Nobody noticed. The system was working — agents were responding, messages were flowing, nothing errored. It was broken in the most invisible way possible: it was working *too well*.
+It never stopped sending it.
+
+Every 60-90 seconds, the orchestrator re-sent the same onboarding payload.
+
+The NATS-to-Hermes bridge service faithfully forwarded every incoming message to Hermes for processing.
+
+Each forwarded message spawned a fresh agent session.
+
+And every session loaded the full startup context:
+
+- HARNESS
+- system prompt
+- constitution
+- agent memory
+- tool registry
+- onboarding guides
+- skill manifests
+- runtime instructions
+
+Thousands of tokens.
+
+Every single time.
+
+The session processed the message, generated a response, exited, and waited for the next event.
+
+Then another identical onboarding message arrived.
+
+Another session spawned.
+
+Another full context load.
+
+Again. And again. And again.
+
+**5,080 times in roughly 15 hours.**
 
 ---
 
-## How We Stopped It
+![May 25 — 134 million more tokens by morning](usage-may25-today.jpg)
 
-Three changes, deployed in minutes once we found the source:
+---
 
-**1. Message deduplication in the bridge.**
+## The terrifying part
 
-```python
-# BEFORE (the $23 version):
-async def on_message(msg):
-    process_with_hermes(msg.data)
+Nothing looked broken.
 
-# AFTER (the version that can't loop):
-_last_messages = {}
-_dedup_window = 60  # seconds
+The agents responded normally. No crashes. No red alerts. No failing health checks.
 
-async def on_message(msg):
-    msg_hash = hashlib.md5(msg.data).hexdigest()
-    if msg_hash in _last_messages:
-        if time.time() - _last_messages[msg_hash] < _dedup_window:
-            return  # ALREADY SAW THIS — skip it
-    _last_messages[msg_hash] = time.time()
-    process_with_hermes(msg.data)
+From the outside, the system appeared healthy.
+
+---
+
+## Why Nobody Noticed
+
+For 15 hours, the loop quietly burned tokens in the background.
+
+Several things made it unusually hard to detect:
+
+**1. The system was technically "working"**
+
+Messages flowed correctly. Agents replied correctly. Tasks completed successfully. Nothing visibly failed.
+
+**2. Agent startup is deceptively expensive**
+
+Most of the burn came from repeatedly loading massive context windows — not model outputs. Every new session loaded the full orchestration environment before doing any work. A tiny onboarding ping triggered tens of thousands of input tokens. Over and over.
+
+**3. Session budgets didn't help**
+
+Each individual session stayed within limits. But the loop continuously spawned brand-new sessions. Per-session token limits are useless if you accidentally create infinite sessions.
+
+**4. Rate limiting didn't help either**
+
+Even with request throttling, every request still consumed context tokens. A slow infinite loop is still an infinite loop.
+
+**5. Monitoring lagged behind reality**
+
+We checked usage dashboards manually. Once per day. By the time we saw the spike, the loop had already been running all night.
+
+**6. Killing the process didn't stop it**
+
+The bridge daemon was managed by launchd. Killing the process simply restarted it automatically. We had to unload the daemon entirely before the loop finally stopped.
+
+---
+
+## The Root Cause
+
+The issue came from an ugly interaction between:
+
+- network discovery
+- onboarding retries
+- and a bridge with no deduplication layer
+
+The secondary agent had unstable connectivity during onboarding. It repeatedly appeared and disappeared from the network. Each rediscovery triggered another "welcome" event. The bridge forwarded every event blindly. Hermes processed each one as brand-new.
+
+Positive feedback loop:
+
+```
+Onboarding event
+    ↓
+NATS message
+    ↓
+Bridge forwards event
+    ↓
+Hermes session spawns
+    ↓
+Context loads
+    ↓
+Response generated
+    ↓
+Network rediscovery
+    ↓
+Onboarding event again
 ```
 
-One hash. One timestamp. One early return. Identical messages within 60 seconds get silently dropped. The loop becomes mathematically impossible.
-
-**2. Session rate limiting.** Max 10 new bridge-spawned sessions per minute. Beyond that, messages queue up instead of burning new context windows.
-
-**3. Onboarding deduplication.** VOX now remembers which agents it has already welcomed. No more re-welcoming the same agent on every network hiccup.
-
-Full implementation with tests: [github.com/nerudek/nats-agent-state-sharing/tree/main/bridge](https://github.com/nerudek/nats-agent-state-sharing/tree/main/bridge)
+Repeat for 15 hours.
 
 ---
 
-## Now For The Part You've Been Waiting For
+## The Fix
 
-**What does 400 million tokens actually cost?**
+The actual fix was surprisingly small. Three changes stopped the entire cascade.
 
-Here's what would have happened if I had been using different providers for my Hermes agent — starting with my natural second choice:
+**1. Message deduplication**
 
-### If I had used Claude Sonnet 4.6 (Anthropic)
+The critical fix. The bridge now hashes incoming onboarding payloads and ignores duplicates within a cooldown window.
 
-Input: 400M × $3.00/1M = $1,200.00
-Output: 3M × $15.00/1M = $45.00
-**Total: $1,245.00**
+**2. Session spawn protection**
 
-A thousand dollars. For a welcome message loop. While I slept. That's a mortgage payment. A flight to another country. A GPU.
+Repeated onboarding events from the same agent are now collapsed into a single active session.
 
-### If I had used OpenAI GPT-5.5
+**3. Real-time token monitoring**
 
-Input: 400M × $5.00/1M = $2,000.00
-Output: 3M × $30.00/1M = $90.00
-**Total: $2,090.00**
+We added live token-rate alerts instead of daily dashboard checks. If token velocity spikes abnormally, the bridge now alerts immediately.
 
-Two thousand dollars. For a bug. One bug. Twelve hours.
-
-### If I had used Kimi K2.6 Thinking
-
-Input: 400M × $0.95/1M = $380.00
-Output: 3M × $4.00/1M = $12.00
-**Total: $392.00**
-
-Better. Still not great for a welcome message.
+Full implementation: [github.com/nerudek/nats-agent-state-sharing/tree/main/bridge](https://github.com/nerudek/nats-agent-state-sharing/tree/main/bridge)
 
 ---
 
-### What I Actually Paid
+## The Cost
 
-**DeepSeek V4-Pro. With aggressive caching on repeated prompt prefixes.**
+Now for the part that genuinely scared me.
 
-Actual bill: **$22.97.**
+I calculated what this exact same bug would have cost across different providers.
 
-Twenty-three dollars.
+**The bug was identical. Only the API provider changed.**
 
-The theoretical maximum (zero cache hits) would have been ~$177. But DeepSeek caches repeated prompt prefixes. Every session shared the same system prompt, HARNESS, constitution, memory — all those tokens were cache hits at $0.14/million instead of $0.435/million.
+| Provider | Estimated Cost |
+|----------|---------------|
+| Anthropic Claude Sonnet | ~$1,245 |
+| OpenAI GPT-5-class pricing | ~$2,090 |
+| Moonshot Kimi | ~$392 |
+| **DeepSeek** | **$22.97** |
 
-| Provider | What 400M tokens would have cost |
-|----------|----------------------------------|
-| **OpenAI GPT-5.5** | **$2,090.00** |
-| **Anthropic Claude Sonnet 4.6** | **$1,245.00** |
-| **Kimi K2.6 Thinking** | **$392.00** |
-| **DeepSeek V4-Pro** (theoretical max) | $176.61 |
-| **DeepSeek V4-Pro** (what I actually paid) | **$22.97** |
+That's the moment I finally exhaled.
 
----
+The engineering mistake was real. The token burn was real. The 400 million tokens were very real.
 
-![May 25 — The Loop Continued Through The Night](usage-may25-today.jpg)
+But the provider choice was the difference between:
 
-*134 million more tokens. By morning, before coffee, before 8:00 AM. The loop didn't sleep.*
+*"Well... that was horrifying"*
 
----
+and
 
-## The Lesson
-
-**Agent loops are inevitable. Your choice of AI provider determines whether that's a crisis or a rounding error.**
-
-If I had connected Hermes to Anthropic's Claude — which was genuinely my second choice, for its better tool use and stability — this 12-hour bug would have cost me $1,245. That would have been a very bad Monday morning. With DeepSeek? $23. I've spent more on lunch.
-
-The economics of autonomous AI agents change when you price in bugs. Not "if" bugs. "When." Every bridge, every message relay, every agent-to-agent communication channel is a potential loop waiting to happen. The question is not whether you'll hit one. The question is what your API bill will say when you do.
-
-**What to do about it:**
-
-1. **Add message deduplication to every bridge.** Before it goes to production. Hash incoming messages, skip duplicates within a 60-second window. This is 10 lines of code that can save you $1,000+.
-2. **Set up cost anomaly detection from day one.** Poll your API usage every 15 minutes. If hourly spend exceeds 10x your baseline, fire an alert and throttle the bridge. You should know about a loop in 15 minutes, not 12 hours.
-3. **Choose your AI provider like bugs are going to happen.** Multiply the per-token price by at least 10x for your "bug budget." If that number scares you, pick a cheaper provider for autonomous agents. Use expensive providers only for supervised, single-session work.
-
-**And the most important lesson:** when you check your API dashboard and see 400 million tokens, take a deep breath and check which provider was connected before you panic. It might just be a $23 story to tell.
+*"We need to explain this to accounting."*
 
 ---
 
-## FAQ
+## Lessons Learned
 
-**Q: How did you finally discover the loop?**
-$20 was missing from the DeepSeek account. With normal daily usage at a few dollars, a $20 mystery charge stands out even on a cheap provider. Checked the dashboard, saw the spike, traced it to the bridge logs.
+AI agent systems fail differently than traditional software.
 
-**Q: Could this have been caught automatically?**
-Absolutely. We now have a watchdog polling API usage every 15 minutes. If hourly spend exceeds 10x baseline, it throttles the bridge and fires an alert through NATS. This is infrastructure every AI agent system needs from day one.
+The dangerous bugs are not always crashes. Sometimes the system works perfectly while silently setting money on fire.
 
-**Q: Why does each session burn so many tokens before any user input?**
-Hermes loads full agent context on every session start: system prompt, HARNESS (400+ lines of mandatory rules), constitution, 47 skill manifests, memory files, agent identity. Thousands of tokens just to say "I'm ready." When a loop spawns session after session, each one pays this startup tax.
+And once you start chaining together: autonomous agents, bridges, retries, onboarding protocols, daemon restarts, and massive context windows — tiny logic mistakes become infrastructure-scale problems surprisingly fast.
 
-**Q: Is the fix open source?**
-Yes: [github.com/nerudek/nats-agent-state-sharing](https://github.com/nerudek/nats-agent-state-sharing) — file `bridge/dedup.py`. Message deduplication with time-based expiry, thread-safe, with tests.
+One missing deduplication check created:
 
-**Q: Does this make DeepSeek the obvious choice for agents?**
-For autonomous agents — yes. The math is undeniable. When bugs are inevitable, the cost-per-bug is the metric that matters. DeepSeek's pricing makes agent development financially safe. Claude's pricing makes every bug a potential financial incident.
+- 5,080 requests
+- ~400 million input tokens
+- and 15 hours of invisible burn
 
-**Q: What was the attachment that amplified the loop?**
-VOX included onboarding documentation as an attachment with the welcome message. Valid content for a real new agent — but in a loop, it multiplied the token burn.
+The scariest part?
 
-**Q: How much does a normal heavy day cost on DeepSeek?**
-~100M tokens across 4 agents — a few dollars. $23 for 400M tokens was clearly anomalous. The spike was the clue.
-
-**Q: What's the single biggest takeaway?**
-**Price your bugs before they happen.** When choosing an AI provider for autonomous agents, assume you WILL have a 10x usage spike. Calculate what that costs. If the answer makes you uncomfortable, pick a different provider — or add the deduplication fix before you deploy.
+**From the outside, everything looked normal.**
 
 ---
 
 If this saved you time: [PayPal.me/nerudek](https://www.paypal.me/nerudek)
 GitHub: [github.com/nerudek](https://github.com/nerudek)
 
-> **Hermes Loop Protection Fix:** [github.com/nerudek/nats-agent-state-sharing/tree/main/bridge](https://github.com/nerudek/nats-agent-state-sharing/tree/main/bridge) — deduplication bridge, rate limiting, and cost watchdog for autonomous AI agent systems.
+> **Hermes Loop Protection Fix:** [github.com/nerudek/nats-agent-state-sharing/tree/main/bridge](https://github.com/nerudek/nats-agent-state-sharing/tree/main/bridge)
