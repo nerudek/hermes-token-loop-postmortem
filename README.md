@@ -1,6 +1,6 @@
-# 400 Million Tokens — A Bill That Should Have Broken Me (And What Actually Happened)
+# 400 Million Tokens — My Heart Stopped When I Saw The Dashboard
 
-> The dashboard showed 400,000,000 tokens consumed in 12 hours. My stomach dropped. Then I did the math.
+> The dashboard showed 400,000,000 tokens. My heart stopped. Then I did the math.
 
 ---
 
