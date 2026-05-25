@@ -1,4 +1,4 @@
-# 400 Million Tokens Down the Drain: How a Looping AI Agent Cost Me $23 (And Would Have Wiped $1,060 With Claude)
+# 400 Million Tokens Down the Drain: The True Cost of an AI Agent Loop (Read Until the End)
 
 > A war story from the multi-agent trenches: the exact bug, the 12+ hour loop, the real cost comparison across 4 providers, and the one-line fix that stopped it.
 
