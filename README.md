@@ -1,5 +1,8 @@
 # 400 Million Tokens Burned Overnight
 
+
+![Cover](banner.png)
+
 > 5,080 API requests. Everything looked normal.
 
 ---
