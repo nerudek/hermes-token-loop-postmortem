@@ -36,7 +36,7 @@ And then the bridge saw the response. And forwarded it. And spawned another sess
 
 Meanwhile, Kubuntu's networking was broken that day. NetworkManager had crashed. The machine kept appearing, disappearing, and reappearing on the network. Each reappearance looked like a brand new agent joining. Each "join" triggered another welcome message from VOX. Loop. Loop. Loop.
 
-For **12 hours**, nobody noticed. The system was working — agents were responding, messages were flowing, nothing errored. It was broken in the most invisible way possible: it was working *too well*.
+**5,080 API requests.** From Sunday 17:00 to Monday 8:00. Nobody noticed. The system was working — agents were responding, messages were flowing, nothing errored. It was broken in the most invisible way possible: it was working *too well*.
 
 ---
 
