@@ -44,10 +44,6 @@ My second thought:
 
 ---
 
-![May 24 — 262 million tokens before the day was even over](usage-may24-yesterday.jpg)
-
----
-
 ## What Happened
 
 An orchestrator agent running on a Mac Mini M4 discovered a new agent on the network.
@@ -94,10 +90,6 @@ Another full context load.
 Again. And again. And again.
 
 **5,080 times in roughly 15 hours.**
-
----
-
-![May 25 — 134 million more tokens by morning](usage-may25-today.jpg)
 
 ---
 
@@ -250,3 +242,11 @@ If this saved you time: [PayPal.me/nerudek](https://www.paypal.me/nerudek)
 GitHub: [github.com/nerudek](https://github.com/nerudek)
 
 > **Hermes Loop Protection Fix:** [github.com/nerudek/nats-agent-state-sharing/tree/main/bridge](https://github.com/nerudek/nats-agent-state-sharing/tree/main/bridge)
+
+---
+
+## The Receipts
+
+![May 24 — 262 million input tokens](usage-may24-yesterday.jpg)
+
+![May 25 — 134 million more by morning](usage-may25-today.jpg)
